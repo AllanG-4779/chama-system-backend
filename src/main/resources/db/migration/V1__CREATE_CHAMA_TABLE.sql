@@ -1,33 +1,46 @@
 CREATE TABLE chama
 (
-    id                   BIGSERIAL PRIMARY KEY,
-    name                 VARCHAR(255)   NOT NULL,
-    registration_number  VARCHAR(100),
-    monthly_contribution DECIMAL(15, 2) NOT NULL,
-    founded_date         DATE           NOT NULL,
-    meeting_schedule     VARCHAR(255),
-    status               VARCHAR(50)    NOT NULL DEFAULT 'ACTIVE',
-    created_at           TIMESTAMP      NOT NULL DEFAULT NOW(),
-    updated_at           TIMESTAMP      NOT NULL DEFAULT NOW()
+    id                    BIGSERIAL PRIMARY KEY,
+    name                  VARCHAR(255)        NOT NULL,
+    registration_number   VARCHAR(100) UNIQUE NOT NULL,
+    contribution_amount   DECIMAL(15, 2)      NOT NULL,
+    description           TEXT,
+    contribution_schedule VARCHAR(255),
+    status                VARCHAR(50)         NOT NULL DEFAULT 'ACTIVE',
+    created_at            TIMESTAMP           NOT NULL DEFAULT NOW(),
+    updated_at            TIMESTAMP           NOT NULL DEFAULT NOW()
 );
 CREATE INDEX idx_chama_status ON chama (status);
 
 CREATE TABLE member
 (
-    id           BIGSERIAL PRIMARY KEY,
-    chama_id     BIGINT       NOT NULL REFERENCES chama (id) ON DELETE CASCADE,
-    full_name    VARCHAR(255) NOT NULL,
-    phone_number VARCHAR(20)  NOT NULL,
-    email        VARCHAR(255),
-    id_number    VARCHAR(50),
-    joined_date  DATE         NOT NULL,
-    role         VARCHAR(50)  NOT NULL DEFAULT 'MEMBER',
-    status       VARCHAR(50)  NOT NULL DEFAULT 'ACTIVE',
-    created_at   TIMESTAMP    NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMP    NOT NULL DEFAULT NOW()
+    id            BIGSERIAL PRIMARY KEY,
+    first_name    VARCHAR(255) NOT NULL,
+    last_name     VARCHAR(255) NOT NULL,
+    date_of_birth DATE         NOT NULL,
+    phone_number  VARCHAR(20)  NOT NULL,
+    email         VARCHAR(255),
+    id_number     VARCHAR(50)  NOT NULL,
+    status        VARCHAR(50)  NOT NULL DEFAULT 'ACTIVE',
+    created_at    TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_member_chama ON member (chama_id);
+CREATE TABLE chama_member
+(
+    id         BIGSERIAL PRIMARY KEY,
+    chama_id   BIGINT      NOT NULL REFERENCES chama (id) ON DELETE CASCADE,
+    member_id  BIGINT      NOT NULL REFERENCES member (id) ON DELETE CASCADE,
+    joined_at  TIMESTAMP   NOT NULL DEFAULT NOW(),
+    role       VARCHAR(50) NOT NULL DEFAULT 'MEMBER', -- MEMBER, CHAIRMAN, TREASURER, SECRETARY,
+    status     VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+    created_at TIMESTAMP   NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP   NOT NULL DEFAULT NOW(),
+    deleted_at TIMESTAMP   NOT NULL DEFAULT now(),
+    UNIQUE (chama_id, member_id)
+
+);
+
 CREATE INDEX idx_member_phone ON member (phone_number);
 CREATE INDEX idx_member_status ON member (status);
 
@@ -160,7 +173,7 @@ CREATE TABLE transaction_audit_log
     status_after      VARCHAR(50),           -- New status
 
     -- User who performed the action
-    performed_by_id   BIGINT REFERENCES app_user (id) ON DELETE SET NULL,
+    performed_by_id   BIGINT       REFERENCES app_user (id) ON DELETE SET NULL,
     performed_by_name VARCHAR(255) NOT NULL,
     performed_by_role VARCHAR(50)  NOT NULL, -- CHAIRMAN, TREASURER, SECRETARY
 

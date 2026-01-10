@@ -2,5 +2,18 @@
 spring:
   application:
     name: investment-management-system
+  flyway:
+    default-schema: investment
+    user: postgres
+    password: cnd80751xh
+    url: jdbc:postgresql://localhost:5434/investment_db
+  r2dbc:
+    username: postgres
+    password: cnd80751xh
+    url: r2dbc:postgresql://localhost:5434/investment_db?currentSchema=investment
+    pool:
+      max-create-connection-time: 5s
 server:
   port: 8089
+  servlet:
+    context-path: /api/v1

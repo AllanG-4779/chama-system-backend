@@ -15,29 +15,22 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+
 public class Chama {
     @Id
     private Long id;
-
     private String name;
-
     @Column("registration_number")
     private String registrationNumber;
-
-    @Column("monthly_contribution")
-    private BigDecimal monthlyContribution;
-
-    @Column("founded_date")
-    private LocalDate foundedDate;
-
-    @Column("meeting_schedule")
-    private String meetingSchedule;
-
-    private String status; // ACTIVE, SUSPENDED, DISSOLVED
-
+    @Column("contribution_amount")
+    private BigDecimal contributionAmount;
+    private String description;
+    @Column("contribution_schedule")
+    private String contributionSchedule; // e.g., WEEKLY, MONTHLY
+    private String status; // ACTIVE, INACTIVE, DISSOLVED
     @Column("created_at")
     private LocalDateTime createdAt;
-
     @Column("updated_at")
     private LocalDateTime updatedAt;
+
 }
