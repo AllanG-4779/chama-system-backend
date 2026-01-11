@@ -51,12 +51,14 @@ public class MemberOnboardingFacade {
     public Mono<ResponseDto> onBoardChama(ChamaDto chamaDto) {
         return chamaService.createChama(chamaDto)
                 .flatMap(createdChama -> memberService.createMember(chamaDto.contactPerson())
+                        .flatMap(created-> chamaMemberService.addMemberToChama(created.id(), createdChama.getId())
+                                .map(onboardedMember -> created))
                         .flatMap(member -> chamaMemberService.updateChamaMemberRole(createdChama.getId(), member.id(), "ADMIN")))
                 .flatMap(data -> {
                     var response = new ResponseDto("Chama onboarded successfully",
                             null, true, 201);
                     return Mono.just(response);
-                });
+                }).as(transactionalOperator::transactional);
     }
 
     public Mono<ResponseDto> activateLoginCredentials(AppUserDto appUserCreds) {
