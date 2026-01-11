@@ -1,4 +1,4 @@
-package com.allang.chamasystem.chama.service;
+package com.allang.chamasystem.service;
 
 import com.allang.chamasystem.dto.MemberDto;
 import com.allang.chamasystem.exceptions.GenericExceptions;

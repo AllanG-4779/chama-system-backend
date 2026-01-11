@@ -8,6 +8,7 @@ public record ChamaDto(
         String description,
         BigDecimal contributionAmount,
         String contributionSchedule,
-        String registrationNumber
+        String registrationNumber,
+        MemberDto contactPerson
 ) {
 }

@@ -1,4 +1,4 @@
-package com.allang.chamasystem.chama.service;
+package com.allang.chamasystem.service;
 
 import com.allang.chamasystem.dto.ChamaDto;
 import com.allang.chamasystem.dto.ResponseDto;
@@ -17,7 +17,8 @@ public class ChamaService {
 
     private final ChamaRepository chamaRepository;
 
-    public Mono<ResponseDto> createChama(ChamaDto chamaDto) {
+
+    public Mono<Chama> createChama(ChamaDto chamaDto) {
         return chamaRepository.existsByRegistrationNumber(chamaDto.registrationNumber())
                 .flatMap(existingChama -> {
                     if (existingChama) {
@@ -30,9 +31,7 @@ public class ChamaService {
                         chama.setDescription(chamaDto.description());
                         chama.setContributionAmount(chamaDto.contributionAmount());
                         chama.setContributionSchedule(chamaDto.contributionSchedule());
-                        return chamaRepository.save(chama)
-                                .flatMap(savedChama -> Mono.just(new ResponseDto("Chama created successfully",
-                                        savedChama, true, 200)));
+                        return chamaRepository.save(chama);
                     }
                 });
     }
@@ -106,7 +105,7 @@ public class ChamaService {
                 chama.getDescription(),
                 chama.getContributionAmount(),
                 chama.getContributionSchedule(),
-                chama.getRegistrationNumber()
+                chama.getRegistrationNumber(), null
         );
     }
 
