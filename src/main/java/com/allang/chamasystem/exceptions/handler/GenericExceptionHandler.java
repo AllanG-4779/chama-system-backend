@@ -1,5 +1,6 @@
 package com.allang.chamasystem.exceptions.handler;
 
+import com.allang.chamasystem.dto.ResponseDto;
 import com.allang.chamasystem.exceptions.GenericExceptions;
 import org.jspecify.annotations.NonNull;
 import org.springframework.http.ResponseEntity;
@@ -12,9 +13,9 @@ import reactor.core.publisher.Mono;
 public class GenericExceptionHandler {
 
     @ExceptionHandler(GenericExceptions.class)
-    public Mono<@NonNull ResponseEntity<@NonNull String>> handleGenericException(GenericExceptions ex) {
+    public Mono<@NonNull ResponseEntity<@NonNull ResponseDto>> handleGenericException(GenericExceptions ex) {
         return Mono.just(ResponseEntity
-                .badRequest()
-                .body(ex.getMessage()));
+                .status(400)
+                .body(new ResponseDto(ex.getMessage(), null, false, 400)));
     }
 }

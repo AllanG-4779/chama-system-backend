@@ -5,6 +5,7 @@ import com.allang.chamasystem.dto.ResponseDto;
 import com.allang.chamasystem.exceptions.GenericExceptions;
 import com.allang.chamasystem.models.ChamaMember;
 import com.allang.chamasystem.repository.ChamaMemberRepository;
+import com.allang.chamasystem.repository.ChamaRepository;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
@@ -16,27 +17,34 @@ import java.time.LocalDateTime;
 @Service
 public class ChamaMemberService {
     private final ChamaMemberRepository chamaMemberRepository;
+    private final ChamaRepository chamaRepository;
 
     public Mono<ChamaMemberDto> addMemberToChama(Long memberId, Long chamaId) {
         if (memberId == null || chamaId == null) {
             return Mono.error(new GenericExceptions("Member ID and Chama ID must not be null"));
         }
-        return chamaMemberRepository.existsByChamaIdAndMemberId(memberId, chamaId)
-                .flatMap(exists -> {
-                    if (exists) {
-                        return Mono.error(new GenericExceptions("Member is already part of the Chama"));
-                    } else {
-                        var chamaMember = new com.allang.chamasystem.models.ChamaMember();
-                        chamaMember.setChamaId(chamaId);
-                        chamaMember.setMemberId(memberId);
-                        chamaMember.setRole("MEMBER");
-                        return chamaMemberRepository.save(chamaMember)
-                                .map(savedChamaMember -> new ChamaMemberDto(
-                                        savedChamaMember.getChamaId(),
-                                        savedChamaMember.getMemberId(),
-                                        savedChamaMember.getRole()
-                                ));
+        return chamaRepository.existsById(chamaId)
+                .flatMap(chamaExists -> {
+                    if (!chamaExists) {
+                        return Mono.error(new GenericExceptions("Chama with ID " + chamaId + " does not exist"));
                     }
+                    return chamaMemberRepository.existsByChamaIdAndMemberId(memberId, chamaId)
+                            .flatMap(exists -> {
+                                if (exists) {
+                                    return Mono.error(new GenericExceptions("Member is already part of the Chama"));
+                                } else {
+                                    var chamaMember = new com.allang.chamasystem.models.ChamaMember();
+                                    chamaMember.setChamaId(chamaId);
+                                    chamaMember.setMemberId(memberId);
+                                    chamaMember.setRole("MEMBER");
+                                    return chamaMemberRepository.save(chamaMember)
+                                            .map(savedChamaMember -> new ChamaMemberDto(
+                                                    savedChamaMember.getChamaId(),
+                                                    savedChamaMember.getMemberId(),
+                                                    savedChamaMember.getRole()
+                                            ));
+                                }
+                            });
                 });
     }
 

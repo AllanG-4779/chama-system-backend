@@ -25,8 +25,8 @@ public class MemberOnboardingFacade {
                                 var response = new ResponseDto("Member onboarded successfully",
                                         null, true, 201);
                                 return Mono.just(response);
-                            }).as(transactionalOperator::transactional);
-                });
+                            });
+                }).as(transactionalOperator::transactional);
     }
 
     public Mono<ResponseDto> elevateMemberRole(Long chamaId, Long memberId, String newRole) {
@@ -44,7 +44,7 @@ public class MemberOnboardingFacade {
                     var response = new ResponseDto("Member joined chama successfully",
                             joinedMember, true, 201);
                     return Mono.just(response);
-                });
+                }).as(transactionalOperator::transactional);
     }
 
 
