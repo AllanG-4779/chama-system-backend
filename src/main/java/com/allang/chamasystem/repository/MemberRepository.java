@@ -1,5 +1,6 @@
 package com.allang.chamasystem.repository;
 
+import com.allang.chamasystem.dto.AppUserDto;
 import com.allang.chamasystem.dto.MemberDto;
 import com.allang.chamasystem.models.AppUser;
 import com.allang.chamasystem.models.Member;
@@ -13,4 +14,6 @@ public interface MemberRepository extends ReactiveCrudRepository<Member, Long> {
     Mono<Boolean> existsByEmail(String email);
 
     Mono<Boolean> existsByPhoneNumber(String phoneNumber);
+
+    Mono<Member> findByIdNumber(String idNumber);
 }

@@ -17,21 +17,31 @@ public class AppUserService {
 
     public Mono<AppUserDto> createCredentials(AppUserDto appUserDto) {
         var newCustomer = new AppUser();
-        return appUserRepository.existsByUsername(appUserDto.getUsername())
-                .flatMap(exists -> {
-                    if (exists) {
-                        return Mono.error(new GenericExceptions("Username already exists"));
-                    }
-                    newCustomer.setUsername(appUserDto.getUsername());
-                    newCustomer.setPasswordHash(appUserDto.getPassword());
-                    newCustomer.setMemberId(appUserDto.getMemberId());
-                    newCustomer.setActive(false);
-                    return appUserRepository.save(newCustomer)
-                            .map(savedUser -> {
-                                appUserDto.setUsername(savedUser.getUsername());
-                                return appUserDto;
-                            });
-                });
+        return memberRepository.findByIdNumber(appUserDto.getIdNumber())
+                .switchIfEmpty(Mono.error(new GenericExceptions("No member found with the provided ID number")))
+                .flatMap(check -> appUserRepository.existsByMemberId(check.getId())
+                        .flatMap(exists -> {
+                            if (exists) {
+                                return Mono.error(new GenericExceptions("Credentials already exist for this member"));
+                            }
+                            return Mono.just(check);
+                        }))
+                .flatMap(memberDto -> appUserRepository.existsByUsername(appUserDto.getUsername())
+                        .flatMap(exists -> {
+                            if (exists) {
+                                return Mono.error(new GenericExceptions("Username already exists"));
+                            }
+                            newCustomer.setUsername(appUserDto.getUsername());
+                            newCustomer.setPasswordHash(appUserDto.getPassword());
+                            newCustomer.setActive(false);
+                            newCustomer.setRoles(appUserDto.getRoles());
+                            newCustomer.setMemberId(memberDto.getId());
+                            return appUserRepository.save(newCustomer)
+                                    .map(savedUser -> {
+                                        appUserDto.setUsername(savedUser.getUsername());
+                                        return appUserDto;
+                                    });
+                        }));
 
     }
 

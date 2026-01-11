@@ -28,7 +28,7 @@ public class ChamaMemberService {
                     if (!chamaExists) {
                         return Mono.error(new GenericExceptions("Chama with ID " + chamaId + " does not exist"));
                     }
-                    return chamaMemberRepository.existsByChamaIdAndMemberId(memberId, chamaId)
+                    return chamaMemberRepository.existsByChamaIdAndMemberId(chamaId, memberId)
                             .flatMap(exists -> {
                                 if (exists) {
                                     return Mono.error(new GenericExceptions("Member is already part of the Chama"));

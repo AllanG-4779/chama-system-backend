@@ -8,4 +8,6 @@ import reactor.core.publisher.Mono;
 
 public interface AppUserRepository extends ReactiveCrudRepository<@NonNull AppUser, @NonNull Long> {
     Mono<Boolean> existsByUsername(String username);
+
+    Mono<Boolean> existsByMemberId(Long memberId);
 }
