@@ -17,22 +17,25 @@ import java.util.List;
 public class AppUser {
     @Id
     private Long id;
-    
+
     @Column("member_id")
     private Long memberId;
-    
+
     private String username;
-    
+
     @Column("password_hash")
     private String passwordHash;
-    
+
     private List<String> roles; // R2DBC maps PostgreSQL arrays to List
-    
+
     private Boolean active;
-    
+    @Column("temporary_token")
+    private String temporaryToken;
+    @Column("temp_iss_at")
+    private LocalDateTime tempIssAt;
     @Column("created_at")
     private LocalDateTime createdAt;
-    
+
     @Column("updated_at")
     private LocalDateTime updatedAt;
 }

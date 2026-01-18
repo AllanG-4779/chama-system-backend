@@ -137,14 +137,16 @@ CREATE INDEX idx_penalty_incurred_date ON penalty (incurred_date);
 
 CREATE TABLE app_user
 (
-    id            BIGSERIAL PRIMARY KEY,
-    member_id     BIGINT UNIQUE REFERENCES member (id) ON DELETE CASCADE,
-    username      VARCHAR(100) UNIQUE NOT NULL,
-    password_hash VARCHAR(255)        NOT NULL,
-    roles         TEXT[]              NOT NULL, -- PostgreSQL array for roles
-    active        BOOLEAN             NOT NULL DEFAULT TRUE,
-    created_at    TIMESTAMP           NOT NULL DEFAULT NOW(),
-    updated_at    TIMESTAMP           NOT NULL DEFAULT NOW()
+    id              BIGSERIAL PRIMARY KEY,
+    member_id       BIGINT UNIQUE REFERENCES member (id) ON DELETE CASCADE,
+    username        VARCHAR(100) UNIQUE NOT NULL,
+    password_hash   VARCHAR(255)        NOT NULL,
+    temporary_token TEXT,
+    temp_iss_at  TIMESTAMP,
+    roles           TEXT[]              NOT NULL, -- PostgreSQL array for roles
+    active          BOOLEAN             NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMP           NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMP           NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_user_username ON app_user (username);

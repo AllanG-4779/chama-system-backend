@@ -1,6 +1,8 @@
 package com.allang.chamasystem.service;
 
 import com.allang.chamasystem.dto.AppUserDto;
+import com.allang.chamasystem.events.UserCreatedEvent;
+import com.allang.chamasystem.events.bus.UserEventBus;
 import com.allang.chamasystem.exceptions.GenericExceptions;
 import com.allang.chamasystem.models.AppUser;
 import com.allang.chamasystem.repository.AppUserRepository;
@@ -9,23 +11,24 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
+
 @RequiredArgsConstructor
 @Service
 public class AppUserService {
     private final MemberRepository memberRepository;
     private final AppUserRepository appUserRepository;
+    private final UserEventBus userEventBus;
 
     public Mono<AppUserDto> createCredentials(AppUserDto appUserDto) {
         var newCustomer = new AppUser();
-        return memberRepository.findByIdNumber(appUserDto.getIdNumber())
-                .switchIfEmpty(Mono.error(new GenericExceptions("No member found with the provided ID number")))
-                .flatMap(check -> appUserRepository.existsByMemberId(check.getId())
-                        .flatMap(exists -> {
-                            if (exists) {
-                                return Mono.error(new GenericExceptions("Credentials already exist for this member"));
-                            }
-                            return Mono.just(check);
-                        }))
+        return appUserRepository.existsByMemberId(appUserDto.getMemberId())
+                .flatMap(exists -> {
+                    if (exists) {
+                        return Mono.error(new GenericExceptions("Credentials already exist for this member"));
+                    }
+                    return Mono.just(appUserDto);
+                })
                 .flatMap(memberDto -> appUserRepository.existsByUsername(appUserDto.getUsername())
                         .flatMap(exists -> {
                             if (exists) {
@@ -35,9 +38,10 @@ public class AppUserService {
                             newCustomer.setPasswordHash(appUserDto.getPassword());
                             newCustomer.setActive(false);
                             newCustomer.setRoles(appUserDto.getRoles());
-                            newCustomer.setMemberId(memberDto.getId());
+                            newCustomer.setMemberId(memberDto.getMemberId());
                             return appUserRepository.save(newCustomer)
                                     .map(savedUser -> {
+                                        userEventBus.publish(new UserCreatedEvent(savedUser.getUsername(), Instant.now()));
                                         appUserDto.setUsername(savedUser.getUsername());
                                         return appUserDto;
                                     });

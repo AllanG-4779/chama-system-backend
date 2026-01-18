@@ -21,6 +21,7 @@ public class MemberOnboardingFacade {
                     var onboarding = onboardingRequest.getCredentials();
                     onboarding.setMemberId(created.id());
                     return chamaMemberService.addMemberToChama(created.id(), onboardingRequest.getChamaId())
+                            .flatMap(each-> appUserService.createCredentials(onboarding))
                             .flatMap(onboardedMember -> {
                                 var response = new ResponseDto("Member onboarded successfully",
                                         null, true, 201);
