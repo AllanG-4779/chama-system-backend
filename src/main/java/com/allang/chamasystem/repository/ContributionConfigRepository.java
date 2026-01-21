@@ -7,4 +7,5 @@ import reactor.core.publisher.Mono;
 
 public interface ContributionConfigRepository extends ReactiveCrudRepository<ContributionConfig, Long> {
     Mono<Long> countAllByChamaId(Long chamaId);
+    Mono<ContributionConfig> findByChamaIdOrderByEndDateDesc(Long chamaId);
 }

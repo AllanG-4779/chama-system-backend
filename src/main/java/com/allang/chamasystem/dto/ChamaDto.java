@@ -1,6 +1,7 @@
 package com.allang.chamasystem.dto;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public record ChamaDto(
         Long id,
@@ -9,6 +10,7 @@ public record ChamaDto(
         BigDecimal contributionAmount,
         String contributionSchedule,
         String registrationNumber,
-        MemberDto contactPerson
+        MemberDto contactPerson,
+        LocalDate anchorageDate
 ) {
 }

@@ -32,5 +32,9 @@ public class Chama {
     private LocalDateTime createdAt;
     @Column("updated_at")
     private LocalDateTime updatedAt;
+    @Column("anchor_date")
+    private LocalDate anchorDate;
+    @Column("grace_period_days")
+    private Long gracePeriodDays;
 
 }

@@ -31,6 +31,12 @@ public class ChamaService {
                         chama.setDescription(chamaDto.description());
                         chama.setContributionAmount(chamaDto.contributionAmount());
                         chama.setContributionSchedule(chamaDto.contributionSchedule());
+
+                        if (chamaDto.anchorageDate() == null) {
+                            chama.setAnchorDate(java.time.LocalDate.now());
+                        } else {
+                            chama.setAnchorDate(chamaDto.anchorageDate());
+                        }
                         return chamaRepository.save(chama);
                     }
                 });
@@ -105,7 +111,7 @@ public class ChamaService {
                 chama.getDescription(),
                 chama.getContributionAmount(),
                 chama.getContributionSchedule(),
-                chama.getRegistrationNumber(), null
+                chama.getRegistrationNumber(), null, chama.getAnchorDate()
         );
     }
 

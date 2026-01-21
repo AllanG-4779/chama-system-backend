@@ -1,6 +1,7 @@
 package com.allang.chamasystem.service;
 
 import com.allang.chamasystem.exceptions.GenericExceptions;
+import com.allang.chamasystem.models.Chama;
 import com.allang.chamasystem.models.ContributionConfig;
 import com.allang.chamasystem.repository.ChamaRepository;
 import com.allang.chamasystem.repository.ContributionConfigRepository;
@@ -48,9 +49,35 @@ public class ChamaContributionService {
 
     }
 
-    private ContributionConfig determineContributionConfig(String frequency){
-        var currentYearMonth = YearMonth.now();
-        var currentWeek = java.time.LocalDate.now().get(java.time.temporal.IsoFields.WEEK_OF_WEEK_BASED_YEAR);
+    private ContributionConfig determineContributionConfig(String frequency, Chama chama) {
+        return contributionConfigRepository.findByChamaIdOrderByEndDateDesc(chama.getId())
+                .switchIfEmpty(Mono.defer(() -> {
+                    var config = new ContributionConfig();
+                    config.setChamaId(chama.getId());
+                    config.setStartDate(chama.getAnchorDate());
+                    return Mono.just(config);
+                })).flatMap(config -> {
+                    switch (frequency) {
+                        case "WEEKLY" -> {
+                            config.setEndDate(config.getStartDate().plusWeeks(1));
+                            return Mono.just(config);
+                        }
+                        case "MONTHLY" -> {
+                            config.setEndDate(config.getStartDate().plusMonths(1));
+                            return Mono.just(config);
+                        }
+                        case "DAILY" -> {
+                            config.setEndDate(config.getStartDate().plusDays(1));
+                            return Mono.just(config);
+                        }
+                        default -> {
+                            return Mono.error(new GenericExceptions("Invalid contribution frequency"));
+                        }
+                        config.setGracePeriodEnd(config.getStartDate().plusDays(chama.getGracePeriodDays()));
+                        return Mono.just(config);
+                    }
+
+                });
 
 
     }
