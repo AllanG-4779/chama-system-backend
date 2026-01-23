@@ -36,5 +36,7 @@ public class Chama {
     private LocalDate anchorDate;
     @Column("grace_period_days")
     private Long gracePeriodDays;
+    @Column("active")
+    private Boolean active;
 
 }

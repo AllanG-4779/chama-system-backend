@@ -16,4 +16,6 @@ public interface ChamaRepository extends ReactiveCrudRepository<Chama, Long> {
 
     Mono<Optional<Chama>> findByRegistrationNumber(String registrationNumber);
 
+    Flux<Chama> findAllByActiveIsTrue();
+
 }

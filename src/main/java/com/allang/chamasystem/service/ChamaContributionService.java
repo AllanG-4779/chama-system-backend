@@ -5,11 +5,17 @@ import com.allang.chamasystem.models.Chama;
 import com.allang.chamasystem.models.ContributionConfig;
 import com.allang.chamasystem.repository.ChamaRepository;
 import com.allang.chamasystem.repository.ContributionConfigRepository;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.support.SessionStatus;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 
+@Slf4j
 @Service
 public class ChamaContributionService {
 
@@ -24,61 +30,88 @@ public class ChamaContributionService {
     public Mono<Void> createContributionSession(Long chamaId) {
         return chamaRepository.findById(chamaId)
                 .switchIfEmpty(Mono.error(new GenericExceptions("Chama not found")))
-                .flatMap(chama -> {
-                    var frequency = chama.getContributionSchedule();
-                    switch (frequency) {
-                        case "WEEKLY" -> {
-                            // Logic for weekly contribution session
+                .flatMap(chama -> shouldCreateSession(chama)
+                        .flatMap(shouldCreate -> {
+                            if (shouldCreate) {
+                                return createNewSession(chama).then();
+                            }
                             return Mono.empty();
-                        }
-                        case "MONTHLY" -> {
-                            // Logic for monthly contribution session
-                            return Mono.empty();
-                        }
-                        case "DAILY" -> {
-                            // Logic for quarterly contribution session
-                            return Mono.empty();
-                        }
-                        default -> {
-                            return Mono.error(new GenericExceptions("Invalid contribution frequency"));
-                        }
-
-                    });
-                });
-
-
+                        }))
+                .then();
     }
 
-    private ContributionConfig determineContributionConfig(String frequency, Chama chama) {
-        return contributionConfigRepository.findByChamaIdOrderByEndDateDesc(chama.getId())
+    private Mono<Boolean> shouldCreateSession(Chama chama) {
+        LocalDate today = LocalDate.now();
+
+        // Find the last session
+        return contributionConfigRepository
+                .findFirstByChamaIdOrderByEndDateDesc(chama.getId())
+                .map(lastConfig -> {
+                    // Check if we've passed the end date of the last session
+                    // meaning it's time for a new session
+                    return !lastConfig.getEndDate().isAfter(today);
+                })
+                .defaultIfEmpty(true); // No sessions exist, create first one
+    }
+
+    private Mono<ContributionConfig> createNewSession(Chama chama) {
+        return contributionConfigRepository
+                .findFirstByChamaIdOrderByEndDateDesc(chama.getId())
+                .map(lastConfig -> {
+                    // Next session starts where the last one ended
+                    LocalDate nextStart = lastConfig.getEndDate();
+                    return buildSession(chama, nextStart);
+                })
                 .switchIfEmpty(Mono.defer(() -> {
-                    var config = new ContributionConfig();
-                    config.setChamaId(chama.getId());
-                    config.setStartDate(chama.getAnchorDate());
-                    return Mono.just(config);
-                })).flatMap(config -> {
-                    switch (frequency) {
-                        case "WEEKLY" -> {
-                            config.setEndDate(config.getStartDate().plusWeeks(1));
-                            return Mono.just(config);
-                        }
-                        case "MONTHLY" -> {
-                            config.setEndDate(config.getStartDate().plusMonths(1));
-                            return Mono.just(config);
-                        }
-                        case "DAILY" -> {
-                            config.setEndDate(config.getStartDate().plusDays(1));
-                            return Mono.just(config);
-                        }
-                        default -> {
-                            return Mono.error(new GenericExceptions("Invalid contribution frequency"));
-                        }
-                        config.setGracePeriodEnd(config.getStartDate().plusDays(chama.getGracePeriodDays()));
-                        return Mono.just(config);
-                    }
-
+                    // First session starts at anchor date
+                    LocalDate startDate = chama.getAnchorDate() != null
+                            ? chama.getAnchorDate()
+                            : LocalDate.now();
+                    return Mono.just(buildSession(chama, startDate));
+                }))
+                .flatMap(contributionConfigRepository::save)
+                .doOnSuccess(config -> {
+                    assert config != null;
+                    log.info("Created session for chama {}: {} to {}",
+                            chama.getId(), config.getStartDate(), config.getEndDate());
                 });
-
-
     }
+
+    private ContributionConfig buildSession(Chama chama, LocalDate startDate) {
+        ContributionConfig config = new ContributionConfig();
+        config.setChamaId(chama.getId());
+        config.setStartDate(startDate);
+
+        LocalDate endDate = calculateEndDate(startDate, chama.getContributionSchedule());
+        config.setEndDate(endDate);
+        config.setGracePeriodEnd(endDate.plusDays(chama.getGracePeriodDays()));
+//        config.setStatus("ACTIVE");
+        config.setCreatedAt(LocalDateTime.now());
+
+        return config;
+    }
+
+    private LocalDate calculateEndDate(LocalDate startDate, String schedule) {
+        return switch (schedule) {
+            case "DAILY" -> startDate.plusDays(1);
+            case "WEEKLY" -> startDate.plusWeeks(1);
+            case "BIWEEKLY" -> startDate.plusWeeks(2);
+            case "MONTHLY" -> startDate.plusMonths(1);
+            default -> throw new GenericExceptions("Unsupported schedule: " + schedule);
+        };
+    }
+
+    @Scheduled(cron = "0 0 0 * * *")
+    public void generateDailySessions() {
+        chamaRepository.findAllByActiveIsTrue()
+
+                .flatMap(chama -> sessionService.createContributionSession(chama.getId())
+                        .onErrorResume(error -> {
+                            log.error("Failed to create session for chama {}", chama.getId(), error);
+                            return Mono.empty();
+                        }))
+                .subscribe();
+    }
+
+
 }
