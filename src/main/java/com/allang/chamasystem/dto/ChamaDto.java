@@ -11,6 +11,7 @@ public record ChamaDto(
         String contributionSchedule,
         String registrationNumber,
         MemberDto contactPerson,
+        boolean generatePreviousInvoices,
         LocalDate anchorageDate
 ) {
 }

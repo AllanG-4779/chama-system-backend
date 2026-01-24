@@ -3,7 +3,7 @@ package com.allang.chamasystem.dto;
 public record ResponseDto(
         String message,
         Object data,
-        Boolean status,
+        Boolean successful,
         int statusCode
 ) {
 }

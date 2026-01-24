@@ -2,7 +2,7 @@ package com.allang.chamasystem.service;
 
 import com.allang.chamasystem.dto.AppUserDto;
 import com.allang.chamasystem.events.UserCreatedEvent;
-import com.allang.chamasystem.events.bus.UserEventBus;
+import com.allang.chamasystem.events.bus.SystemEventBus;
 import com.allang.chamasystem.exceptions.GenericExceptions;
 import com.allang.chamasystem.models.AppUser;
 import com.allang.chamasystem.repository.AppUserRepository;
@@ -18,7 +18,7 @@ import java.time.Instant;
 public class AppUserService {
     private final MemberRepository memberRepository;
     private final AppUserRepository appUserRepository;
-    private final UserEventBus userEventBus;
+    private final SystemEventBus userEventBus;
 
     public Mono<AppUserDto> createCredentials(AppUserDto appUserDto) {
         var newCustomer = new AppUser();
@@ -41,7 +41,7 @@ public class AppUserService {
                             newCustomer.setMemberId(memberDto.getMemberId());
                             return appUserRepository.save(newCustomer)
                                     .map(savedUser -> {
-                                        userEventBus.publish(new UserCreatedEvent(savedUser.getUsername(), Instant.now()));
+                                        userEventBus.publishUserCreated(new UserCreatedEvent(savedUser.getUsername(), Instant.now()));
                                         appUserDto.setUsername(savedUser.getUsername());
                                         return appUserDto;
                                     });

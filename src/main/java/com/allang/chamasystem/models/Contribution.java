@@ -18,33 +18,40 @@ import java.time.LocalDateTime;
 public class Contribution {
     @Id
     private Long id;
-    
+
     @Column("member_id")
     private Long memberId;
-    
+
     @Column("chama_id")
     private Long chamaId;
-    
+
     private BigDecimal amount;
-    
+
     @Column("contribution_date")
     private LocalDate contributionDate;
-    
+
     @Column("contribution_period")
-    private String contributionPeriod; // YYYY-MM format
-    
+    private Long periodId; // YYYY-MM format
+
     @Column("payment_method")
     private String paymentMethod; // MPESA, CASH, BANK_TRANSFER
-    
+
     @Column("payment_reference")
     private String paymentReference;
-    
+
     @Column("external_payment_reference")
     private String externalPaymentReference;
-    
+
     @Column("recorded_by")
     private String recordedBy;
-    
+
     @Column("recorded_at")
     private LocalDateTime recordedAt;
+
+    @Column("updated_at")
+    private LocalDateTime updatedAt;
+    @Column("deleted_at")
+    private LocalDateTime deletedAt;
+
+    private Long invoiceId;
 }

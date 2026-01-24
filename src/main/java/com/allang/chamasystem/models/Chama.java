@@ -38,5 +38,6 @@ public class Chama {
     private Long gracePeriodDays;
     @Column("active")
     private Boolean active;
+    private boolean generatePreviousInvoices;
 
 }

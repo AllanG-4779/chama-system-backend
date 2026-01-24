@@ -1,6 +1,7 @@
 package com.allang.chamasystem.controller;
 
 import com.allang.chamasystem.dto.*;
+import com.allang.chamasystem.service.ChamaContributionConfigService;
 import com.allang.chamasystem.service.ChamaService;
 import com.allang.chamasystem.service.MemberOnboardingFacade;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,7 @@ import reactor.core.publisher.Mono;
 public class OnboardingController {
     private final MemberOnboardingFacade onboardingFacade;
     private final ChamaService chamaService;
+    private final ChamaContributionConfigService contributionService;
 
     @PostMapping("/chamas")
     public Mono<ResponseEntity<ResponseDto>> createChama(@RequestBody ChamaDto chamaDto) {
@@ -46,11 +48,5 @@ public class OnboardingController {
                         .ok()
                         .body(item)));
     }
-    @PostMapping("/members/setup-credentials")
-    public Mono<ResponseEntity<ResponseDto>> activateCredentials(@RequestBody AppUserDto onboardingRequest) {
-        return onboardingFacade.activateLoginCredentials(onboardingRequest)
-                .map(responseDto -> ResponseEntity
-                        .ok()
-                        .body(responseDto));
-    }
+
 }
