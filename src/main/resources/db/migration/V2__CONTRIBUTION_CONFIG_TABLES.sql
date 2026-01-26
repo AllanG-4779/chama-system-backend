@@ -19,7 +19,7 @@ CREATE INDEX idx_contribution_config_period ON contribution_config (period);
 CREATE TABLE invoices
 (
     id         BIGSERIAL PRIMARY KEY,
-    member_id  BIGINT         NOT NULL REFERENCES member (id) ON DELETE CASCADE,
+    member_id  BIGINT         NOT NULL REFERENCES chama_member (id) ON DELETE CASCADE,
     chama_id   BIGINT         NOT NULL REFERENCES chama (id) ON DELETE CASCADE,
     amount_due DECIMAL(15, 2) NOT NULL,
     period_id  bigint         NOT NULL REFERENCES contribution_config (id), -- YYYY-MM format

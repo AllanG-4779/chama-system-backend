@@ -1,9 +1,11 @@
 package com.allang.chamasystem.service;
 
+import com.allang.chamasystem.exceptions.GenericExceptions;
 import com.allang.chamasystem.models.Invoice;
 import com.allang.chamasystem.repository.ChamaMemberRepository;
 import com.allang.chamasystem.repository.ContributionConfigRepository;
 import com.allang.chamasystem.repository.InvoiceRepository;
+import lombok.Generated;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
@@ -19,13 +21,12 @@ public class InvoiceService {
     private final InvoiceRepository invoiceRepository;
 
     public Mono<Invoice> createInvoiceForMember(Long chamaMemberId, Long periodId, String type) {
-        return chamaMemberRepository.findById(chamaMemberId)
-                .flatMap(chamaMember -> contributionConfigRepository.findById(periodId)
+        return contributionConfigRepository.findById(periodId)
                         .flatMap(config -> {
                             // Logic to create invoice based on type and config
                             var invoice = new Invoice();
                             invoice.setAmountDue(config.getAmount());
-                            invoice.setMemberId(chamaMember.getMemberId());
+                            invoice.setMemberId(chamaMemberId);
                             invoice.setDueDate(config.getGracePeriodEnd());
                             invoice.setPeriodId(periodId);
                             invoice.setType(type);
@@ -35,7 +36,7 @@ public class InvoiceService {
                             invoice.setIssueDate(LocalDate.now());
                             invoice.setUpdatedAt(LocalDateTime.now());
                             return invoiceRepository.save(invoice);
-                        }));
+                        });
     }
 
     public Mono<Void> updateInvoiceBalanceAndStatus(Long invoiceId, java.math.BigDecimal amountPaid) {
@@ -59,9 +60,8 @@ public class InvoiceService {
                 .then();
     }
 
-    public Mono<Void> autoCreateInvoicesForMember(Long memberId, Long chamaId, Long periodId) {
-        return chamaMemberRepository.findByChamaIdAndMemberId(chamaId, memberId)
-                .flatMap(chamaMember -> createInvoiceForMember(chamaMember.getId(), periodId, "CONTRIBUTION"))
+    public Mono<Void> autoCreateInvoicesForMember(Long memberId, Long periodId) {
+        return createInvoiceForMember(memberId, periodId, "CONTRIBUTION")
                 .then();
     }
 

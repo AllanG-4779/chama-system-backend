@@ -3,3 +3,4 @@ ALTER TABLE contribution_config
 -- ALTER TABLE contribution_config ALTER COLUMN period SET DEFAULT 'MONTHLY';
 ALTER TABLE contribution ADD COLUMN invoice_id BIGINT REFERENCES invoices(id) ON DELETE SET NULL,
     ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT NOW(), ADD COLUMN deleted_at TIMESTAMP  DEFAULT NOW();
+ALTER TABLE chama ADD COLUMN generate_previous_invoices BOOLEAN DEFAULT true

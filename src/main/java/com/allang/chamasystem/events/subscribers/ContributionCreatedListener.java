@@ -26,11 +26,12 @@ public class ContributionCreatedListener {
     //TODO: Check why publishing event on join chama not working for this listener
     public void initialize() {
         subscription = eventBus.contributionPeriodEvents()
+
                 .doOnNext(event -> log.info("Received contribution period event: {}", event))
                 .flatMap(contributionEvent ->
                         {
                             Mono<Void> checked;
-                            if (contributionEvent.singleMember()) {
+                            if (!contributionEvent.singleMember()) {
                                 checked = invoiceService.autoCreateInvoicesForContributions(
                                         contributionEvent.chamaId(),
                                         contributionEvent.periodId()
@@ -38,7 +39,6 @@ public class ContributionCreatedListener {
                             } else {
                                 checked = invoiceService.autoCreateInvoicesForMember(
                                         contributionEvent.memberId(),
-                                        contributionEvent.chamaId(),
                                         contributionEvent.periodId()
                                 );
                             }

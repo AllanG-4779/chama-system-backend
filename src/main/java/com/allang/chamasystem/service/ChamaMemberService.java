@@ -14,7 +14,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @RequiredArgsConstructor
@@ -49,8 +51,8 @@ public class ChamaMemberService {
                                                     .flatMap(each -> publishMemberJoinedEvent(published, each.getId()).thenReturn(published)))
                                             .collectList().then(Mono.just(chamaMember))
                                             .map(savedChamaMember -> new ChamaMemberDto(
-                                                    savedChamaMember.getChamaId(),
                                                     savedChamaMember.getMemberId(),
+                                                    savedChamaMember.getChamaId(),
                                                     savedChamaMember.getRole()
                                             ));
                                 }
@@ -86,23 +88,24 @@ public class ChamaMemberService {
 
     private Mono<Void> publishMemberJoinedEvent(ChamaMember chamaMember, Long periodId) {
         return Mono.fromRunnable(() -> {
-            try {
-                // Publish event for new member joining
-                systemEventBus.publishContributionPeriodCreated(
-                        new ContributionPeriodCreatedEvent(
-                                chamaMember.getChamaId(),
-                                periodId,
-                                true,
-                                chamaMember.getMemberId()
-                        )
-                );
-                log.info("Published MemberJoinedEvent for member {} in chama {}",
-                        chamaMember.getMemberId(), chamaMember.getChamaId());
-            } catch (Exception e) {
-                log.error("Failed to publish MemberJoinedEvent: {}", e.getMessage(), e);
-                // Don't fail the whole operation if event publishing fails
-            }
-        }).then();
+                    try {
+                        // Publish event for new member joining
+                        systemEventBus.publishContributionPeriodCreated(
+                                new ContributionPeriodCreatedEvent(
+                                        chamaMember.getChamaId(),
+                                        periodId,
+                                        true,
+                                        chamaMember.getId()
+                                )
+                        );
+                        log.info("Published MemberJoinedEvent for member {} in chama {}",
+                                chamaMember.getMemberId(), chamaMember.getChamaId());
+                    } catch (Exception e) {
+                        log.error("Failed to publish MemberJoinedEvent: {}", e.getMessage(), e);
+                        // Don't fail the whole operation if event publishing fails
+                    }
+                }).delayElement(Duration.ofMillis(100))  // Ensure DB transaction commits
+                .subscribeOn(Schedulers.boundedElastic()).then();
     }
 
 }
