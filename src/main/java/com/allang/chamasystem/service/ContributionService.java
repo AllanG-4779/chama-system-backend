@@ -37,7 +37,7 @@ public class ContributionService {
                                 contributionDto.getMemberId())
                         .switchIfEmpty(Mono.error(new GenericExceptions("Please process invoice for the member before recording contribution payment.")))
                         .flatMap(invoice -> {
-                            if (invoice.getAmountDue().compareTo(BigDecimal.ZERO) <= 0) {
+                            if (invoice.getAmountOutstanding().compareTo(BigDecimal.ZERO) <= 0) {
                                 return Mono.error(new GenericExceptions("This invoice is already fully paid."));
                             }
                             var contribution = new Contribution();
