@@ -32,11 +32,21 @@ public class ChamaService {
                         chama.setContributionAmount(chamaDto.contributionAmount());
                         chama.setContributionSchedule(chamaDto.contributionSchedule());
                         chama.setGeneratePreviousInvoices(chamaDto.generatePreviousInvoices());
+
+                        // Set anchor date
                         if (chamaDto.anchorageDate() == null) {
                             chama.setAnchorDate(java.time.LocalDate.now());
                         } else {
                             chama.setAnchorDate(chamaDto.anchorageDate());
                         }
+
+                        // Set grace period (default to 5 days if not provided)
+                        chama.setGracePeriodDays(chamaDto.gracePeriodDays() != null ? chamaDto.gracePeriodDays() : 5L);
+
+                        // Set penalty configuration (default to NONE if not provided)
+                        chama.setLatePenaltyType(chamaDto.latePenaltyType() != null ? chamaDto.latePenaltyType() : "NONE");
+                        chama.setLatePenaltyAmount(chamaDto.latePenaltyAmount() != null ? chamaDto.latePenaltyAmount() : java.math.BigDecimal.ZERO);
+
                         return chamaRepository.save(chama);
                     }
                 });
@@ -83,6 +93,15 @@ public class ChamaService {
                     if (chamaDto.contributionAmount() != null) {
                         existingChama.setContributionAmount(chamaDto.contributionAmount());
                     }
+                    if (chamaDto.gracePeriodDays() != null) {
+                        existingChama.setGracePeriodDays(chamaDto.gracePeriodDays());
+                    }
+                    if (chamaDto.latePenaltyType() != null) {
+                        existingChama.setLatePenaltyType(chamaDto.latePenaltyType());
+                    }
+                    if (chamaDto.latePenaltyAmount() != null) {
+                        existingChama.setLatePenaltyAmount(chamaDto.latePenaltyAmount());
+                    }
                     return chamaRepository.save(existingChama)
                             .flatMap(updatedChama -> Mono.just(new ResponseDto("Chama updated successfully",
                                     mapToDto(updatedChama), true, 200)));
@@ -111,7 +130,13 @@ public class ChamaService {
                 chama.getDescription(),
                 chama.getContributionAmount(),
                 chama.getContributionSchedule(),
-                chama.getRegistrationNumber(), null, chama.isGeneratePreviousInvoices(), chama.getAnchorDate()
+                chama.getRegistrationNumber(),
+                null,
+                chama.isGeneratePreviousInvoices(),
+                chama.getAnchorDate(),
+                chama.getGracePeriodDays(),
+                chama.getLatePenaltyType(),
+                chama.getLatePenaltyAmount()
         );
     }
 

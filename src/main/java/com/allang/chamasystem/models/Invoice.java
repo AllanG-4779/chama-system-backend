@@ -36,4 +36,5 @@ public class Invoice {
     private String status; // PENDING, PARTIAL, PAID, OVERPAID, OVERDUE
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Long penaltyInvoiceId; // Links to penalty invoice (if penalty was created)
 }

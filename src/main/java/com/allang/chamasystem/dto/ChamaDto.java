@@ -12,6 +12,9 @@ public record ChamaDto(
         String registrationNumber,
         MemberDto contactPerson,
         boolean generatePreviousInvoices,
-        LocalDate anchorageDate
+        LocalDate anchorageDate,
+        Long gracePeriodDays,
+        String latePenaltyType,       // NONE, FIXED, PERCENTAGE
+        BigDecimal latePenaltyAmount  // Amount or percentage (0.05 = 5%)
 ) {
 }

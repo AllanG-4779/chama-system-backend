@@ -18,4 +18,8 @@ public interface InvoiceRepository extends ReactiveCrudRepository<Invoice, Long>
 
     // Find all invoices for a member
     Flux<Invoice> findByMemberId(Long memberId);
+
+    // Find contribution invoices with outstanding balance that don't have penalties yet
+    @Query("SELECT * FROM invoices WHERE period_id = :periodId AND type = 'CONTRIBUTION' AND amount_outstanding > 0 AND penalty_invoice_id IS NULL")
+    Flux<Invoice> findOutstandingInvoicesForPeriod(Long periodId);
 }

@@ -39,5 +39,9 @@ public class Chama {
     @Column("active")
     private Boolean active;
     private boolean generatePreviousInvoices;
+    @Column("late_penalty_type")
+    private String latePenaltyType; // NONE, FIXED, PERCENTAGE
+    @Column("late_penalty_amount")
+    private BigDecimal latePenaltyAmount; // Fixed amount or percentage (0.05 = 5%)
 
 }

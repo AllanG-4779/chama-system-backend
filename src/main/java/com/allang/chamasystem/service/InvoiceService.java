@@ -150,13 +150,16 @@ public class InvoiceService {
     }
 
     /**
-     * Auto-apply available excess when creating a new invoice for a member
+     * Auto-apply available excess balance to any invoice (reusable for contributions, penalties, etc.)
+     * @param memberId The member whose excess to apply
+     * @param targetInvoiceId The invoice to apply excess to
+     * @return Updated invoice with excess applied
      */
-    public Mono<Invoice> createInvoiceAndAutoApplyExcess(Long chamaMemberId, Long periodId, String type) {
-        return createInvoiceForMember(chamaMemberId, periodId, type)
-                .flatMap(newInvoice -> {
+    public Mono<Invoice> autoApplyExcessToInvoice(Long memberId, Long targetInvoiceId) {
+        return invoiceRepository.findById(targetInvoiceId)
+                .flatMap(targetInvoice -> {
                     // Find invoices with available excess for this member
-                    return invoiceRepository.findInvoicesWithExcessByMemberId(chamaMemberId)
+                    return invoiceRepository.findInvoicesWithExcessByMemberId(memberId)
                             .flatMap(sourceInvoice -> getAvailableExcessForInvoice(sourceInvoice.getId())
                                     .flatMap(availableExcess -> {
                                         if (availableExcess.compareTo(BigDecimal.ZERO) <= 0) {
@@ -164,7 +167,7 @@ public class InvoiceService {
                                         }
 
                                         // Calculate how much to apply (min of available excess and outstanding amount)
-                                        return invoiceRepository.findById(newInvoice.getId())
+                                        return invoiceRepository.findById(targetInvoiceId)
                                                 .flatMap(freshInvoice -> {
                                                     BigDecimal outstanding = freshInvoice.getAmountOutstanding() != null
                                                             ? freshInvoice.getAmountOutstanding()
@@ -178,15 +181,23 @@ public class InvoiceService {
 
                                                     return applyExcessToInvoice(
                                                             sourceInvoice.getId(),
-                                                            newInvoice.getId(),
+                                                            targetInvoiceId,
                                                             amountToApply
                                                     );
                                                 });
                                     })
                             )
-                            .then(invoiceRepository.findById(newInvoice.getId())) // Return the updated invoice
-                            .defaultIfEmpty(newInvoice); // If no excess to apply, return original
+                            .then(invoiceRepository.findById(targetInvoiceId)) // Return the updated invoice
+                            .defaultIfEmpty(targetInvoice); // If no excess to apply, return original
                 });
+    }
+
+    /**
+     * Auto-apply available excess when creating a new invoice for a member
+     */
+    public Mono<Invoice> createInvoiceAndAutoApplyExcess(Long chamaMemberId, Long periodId, String type) {
+        return createInvoiceForMember(chamaMemberId, periodId, type)
+                .flatMap(newInvoice -> autoApplyExcessToInvoice(chamaMemberId, newInvoice.getId()));
     }
 
 }
