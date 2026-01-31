@@ -24,6 +24,9 @@ import java.util.Locale;
 @Service
 public class ChamaContributionConfigService {
 
+    // Create new session X days before current period ends (advance notice for members)
+    private static final int ADVANCE_NOTICE_DAYS = 7;
+
     private final ChamaRepository chamaRepository;
     private final ContributionConfigRepository contributionConfigRepository;
     private final SystemEventBus systemEventBus;
@@ -54,9 +57,10 @@ public class ChamaContributionConfigService {
         return contributionConfigRepository
                 .findFirstByChamaIdOrderByEndDateDesc(chama.getId())
                 .map(lastConfig -> {
-                    // Check if we've passed the end date of the last session
-                    // meaning it's time for a new session
-                    return !lastConfig.getEndDate().isAfter(today);
+                    // Create new session ADVANCE_NOTICE_DAYS before current period ends
+                    // This gives members advance notice of upcoming contributions
+                    LocalDate createThreshold = lastConfig.getEndDate().minusDays(ADVANCE_NOTICE_DAYS);
+                    return !today.isBefore(createThreshold); // today >= threshold
                 })
                 .defaultIfEmpty(true); // No sessions exist, create first one
     }
@@ -65,8 +69,8 @@ public class ChamaContributionConfigService {
         return contributionConfigRepository
                 .findFirstByChamaIdOrderByEndDateDesc(chama.getId())
                 .map(lastConfig -> {
-                    // Next session starts where the last one ended
-                    LocalDate nextStart = lastConfig.getEndDate();
+                    // Next session starts where the last one ended plus one day
+                    LocalDate nextStart = lastConfig.getEndDate().plusDays(1);
                     return buildSession(chama, nextStart);
                 })
                 .switchIfEmpty(Mono.defer(() -> {

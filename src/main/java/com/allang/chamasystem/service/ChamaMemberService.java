@@ -11,12 +11,10 @@ import com.allang.chamasystem.repository.ChamaRepository;
 import com.allang.chamasystem.repository.ContributionConfigRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 
 @RequiredArgsConstructor
@@ -47,9 +45,15 @@ public class ChamaMemberService {
                                     chamaMember.setMemberId(memberId);
                                     chamaMember.setRole("MEMBER");
                                     return chamaMemberRepository.save(chamaMember)
-                                            .flatMapMany(published -> contributionConfigRepository.findAllByChamaId(chamaMember.getChamaId())
-                                                    .flatMap(each -> publishMemberJoinedEvent(published, each.getId()).thenReturn(published)))
-                                            .collectList().then(Mono.just(chamaMember))
+                                            .publishOn(Schedulers.boundedElastic())
+                                            .doOnSuccess(savedMember -> {
+                                                // Publish events asynchronously AFTER save completes and transaction commits
+                                                assert savedMember != null;
+                                                contributionConfigRepository.findAllByChamaId(savedMember.getChamaId())
+                                                        .flatMap(config -> publishMemberJoinedEvent(savedMember, config.getId()))
+                                                        .doOnError(error -> log.error("Failed to publish member joined events: {}", error.getMessage(), error))
+                                                        .subscribe();
+                                            })
                                             .map(savedChamaMember -> new ChamaMemberDto(
                                                     savedChamaMember.getMemberId(),
                                                     savedChamaMember.getChamaId(),
@@ -104,8 +108,7 @@ public class ChamaMemberService {
                         log.error("Failed to publish MemberJoinedEvent: {}", e.getMessage(), e);
                         // Don't fail the whole operation if event publishing fails
                     }
-                }).delayElement(Duration.ofMillis(100))  // Ensure DB transaction commits
-                .subscribeOn(Schedulers.boundedElastic()).then();
+                }).subscribeOn(Schedulers.boundedElastic()).then();
     }
 
 }
