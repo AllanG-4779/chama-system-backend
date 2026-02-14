@@ -8,6 +8,7 @@ import com.allang.chamasystem.models.ContributionConfig;
 import com.allang.chamasystem.repository.ChamaRepository;
 import com.allang.chamasystem.repository.ContributionConfigRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
@@ -31,6 +32,9 @@ public class ChamaContributionConfigService {
     private final ContributionConfigRepository contributionConfigRepository;
     private final SystemEventBus systemEventBus;
 
+    @Value("${app.development-mode:false}")
+    private boolean developmentMode;
+
     public ChamaContributionConfigService(ChamaRepository chamaRepository, ContributionConfigRepository contributionConfigRepository, SystemEventBus systemEventBus) {
         this.chamaRepository = chamaRepository;
         this.contributionConfigRepository = contributionConfigRepository;
@@ -40,14 +44,19 @@ public class ChamaContributionConfigService {
     public Mono<ContributionConfig> createContributionSession(Long chamaId) {
         return chamaRepository.findById(chamaId)
                 .switchIfEmpty(Mono.error(new GenericExceptions("Chama not found")))
-                .flatMap(chama -> shouldCreateSession(chama)
-                        .flatMap(shouldCreate -> {
-                            if (shouldCreate) {
-                                return createNewSession(chama);
-                            }
-                            return Mono.error(new GenericExceptions("No new session needed at this time"));
-                        }));
-
+                .flatMap(chama -> {
+                    if (developmentMode) {
+                        log.info("Development mode enabled - creating session without calendar check");
+                        return createNewSession(chama);
+                    }
+                    return shouldCreateSession(chama)
+                            .flatMap(shouldCreate -> {
+                                if (shouldCreate) {
+                                    return createNewSession(chama);
+                                }
+                                return Mono.error(new GenericExceptions("No new session needed at this time"));
+                            });
+                });
     }
 
     private Mono<Boolean> shouldCreateSession(Chama chama) {

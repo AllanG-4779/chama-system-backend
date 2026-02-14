@@ -16,6 +16,8 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import static com.allang.chamasystem.service.InvoiceService.checkPenaltyAmount;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -30,7 +32,7 @@ public class PenaltyService {
      * Scheduled job that runs daily to check for expired grace periods
      * and create penalty invoices for outstanding contributions
      */
-    @Scheduled(cron = "0 0 1 * * *") // Run at 1 AM daily
+    @Scheduled(fixedDelay = 24 * 60 * 60 * 1000)
     public void processExpiredGracePeriods() {
         LocalDate today = LocalDate.now();
 
@@ -124,19 +126,6 @@ public class PenaltyService {
      * Calculate penalty amount based on type and outstanding balance
      */
     private BigDecimal calculatePenaltyAmount(BigDecimal outstandingAmount, String penaltyType, BigDecimal penaltyValue) {
-        if (outstandingAmount == null || outstandingAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO;
-        }
-
-        if (penaltyValue == null || penaltyValue.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO;
-        }
-
-        return switch (penaltyType) {
-            case "FIXED" -> penaltyValue;
-            case "PERCENTAGE" ->
-                    outstandingAmount.multiply(penaltyValue).divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP);
-            default -> BigDecimal.ZERO;
-        };
+        return checkPenaltyAmount(outstandingAmount, penaltyType, penaltyValue);
     }
 }

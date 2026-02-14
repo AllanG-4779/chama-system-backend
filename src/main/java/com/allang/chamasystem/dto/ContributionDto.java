@@ -26,6 +26,7 @@ public class ContributionDto {
     private String paymentMethod;      // MPESA, CASH, BANK_TRANSFER
     private String paymentReference;
     private String externalPaymentReference;
+    private Long invoiceId;
     private String recordedBy;
     private LocalDateTime recordedAt;
 }

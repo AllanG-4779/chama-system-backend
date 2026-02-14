@@ -17,3 +17,5 @@ server:
   port: 8089
   servlet:
     context-path: /api/v1
+app:
+  development-mode: true

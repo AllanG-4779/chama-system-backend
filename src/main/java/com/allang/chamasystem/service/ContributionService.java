@@ -16,6 +16,7 @@ import reactor.core.publisher.Mono;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -23,22 +24,19 @@ public class ContributionService {
 
     private final ContributionRepository contributionRepository;
     private final TransactionalOperator transactionalOperator;
-    private final ContributionConfigRepository contributionConfigRepository;
     private final InvoiceService invoiceService;
     private final LedgerService ledgerService;
     private final InvoiceRepository invoiceRepository;
 
     public Mono<Contribution> recordContributionPayment(ContributionDto contributionDto) {
-        return contributionConfigRepository.findById(contributionDto.getPeriodId())
-                .switchIfEmpty(Mono.error(new GenericExceptions("Contribution period configuration not found.")))
-                .flatMap(config -> invoiceRepository.findByPeriodIdAndChamaIdAndMemberId(
-                                contributionDto.getPeriodId(),
-                                contributionDto.getChamaId(),
-                                contributionDto.getMemberId())
+        return invoiceRepository.findById(contributionDto.getInvoiceId())
                         .switchIfEmpty(Mono.error(new GenericExceptions("Please process invoice for the member before recording contribution payment.")))
                         .flatMap(invoice -> {
                             if (invoice.getAmountOutstanding().compareTo(BigDecimal.ZERO) <= 0) {
                                 return Mono.error(new GenericExceptions("This invoice is already fully paid."));
+                            }
+                            if (!Objects.equals(invoice.getMemberId(), contributionDto.getMemberId())) {
+                                return Mono.error(new GenericExceptions("Invoice does not belong to the specified member."));
                             }
                             var contribution = new Contribution();
                             contribution.setChamaId(contributionDto.getChamaId());
@@ -52,23 +50,23 @@ public class ContributionService {
                             contribution.setRecordedBy("system");
                             contribution.setContributionDate(LocalDate.now());
                             contribution.setUpdatedAt(java.time.LocalDateTime.now());
+
                             return transactionalOperator.execute(status ->
                                     contributionRepository.save(contribution)
+
                                             .then(invoiceService.updateInvoiceBalanceAndStatus(invoice.getId(), contributionDto.getAmount()))
+
                                             .then(ledgerService.createLedgerEntry(
                                                     contributionDto.getChamaId(),
                                                     contributionDto.getMemberId(),
-                                                    "Contribution Payment for period " + config.getStartDate() + " to " + config.getEndDate(),
+                                                    "Contribution Payment for invoice " + invoice.getId(),
                                                     contributionDto.getAmount(),
                                                     true,
                                                     invoice.getId()
                                             ))
-
-
-                            ).collectList().then(Mono.just(contribution));
-                        }));
-
-
+                                            .then(invoiceService.applyExcessToUnpaidInvoices(contributionDto.getMemberId()))
+                            ).collectList().then(Mono.just(contribution)).as(transactionalOperator::transactional);
+                        });
     }
 
 

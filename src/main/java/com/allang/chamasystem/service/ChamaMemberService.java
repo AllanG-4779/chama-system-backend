@@ -2,18 +2,16 @@ package com.allang.chamasystem.service;
 
 import com.allang.chamasystem.dto.ChamaMemberDto;
 import com.allang.chamasystem.dto.ResponseDto;
-import com.allang.chamasystem.events.ContributionPeriodCreatedEvent;
-import com.allang.chamasystem.events.bus.SystemEventBus;
 import com.allang.chamasystem.exceptions.GenericExceptions;
 import com.allang.chamasystem.models.ChamaMember;
 import com.allang.chamasystem.repository.ChamaMemberRepository;
 import com.allang.chamasystem.repository.ChamaRepository;
 import com.allang.chamasystem.repository.ContributionConfigRepository;
+import com.allang.chamasystem.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
 
@@ -24,7 +22,9 @@ public class ChamaMemberService {
     private final ChamaMemberRepository chamaMemberRepository;
     private final ChamaRepository chamaRepository;
     private final ContributionConfigRepository contributionConfigRepository;
-    private final SystemEventBus systemEventBus;
+    private final MemberRepository memberRepository;
+    private final InvoiceService invoiceService;
+    private final PenaltyService penaltyService;
 
     public Mono<ChamaMemberDto> addMemberToChama(Long memberId, Long chamaId) {
         if (memberId == null || chamaId == null) {
@@ -36,8 +36,12 @@ public class ChamaMemberService {
                         return Mono.error(new GenericExceptions("Chama with ID " + chamaId + " does not exist"));
                     }
                     return chamaMemberRepository.existsByChamaIdAndMemberId(chamaId, memberId)
+                            .zipWith(memberRepository.existsById(memberId))
                             .flatMap(exists -> {
-                                if (exists) {
+                                if (!exists.getT2()) {
+                                    return Mono.error(new GenericExceptions("Member with ID " + memberId + " does not exist"));
+                                }
+                                if (exists.getT1()) {
                                     return Mono.error(new GenericExceptions("Member is already part of the Chama"));
                                 } else {
                                     var chamaMember = new com.allang.chamasystem.models.ChamaMember();
@@ -45,15 +49,16 @@ public class ChamaMemberService {
                                     chamaMember.setMemberId(memberId);
                                     chamaMember.setRole("MEMBER");
                                     return chamaMemberRepository.save(chamaMember)
-                                            .publishOn(Schedulers.boundedElastic())
-                                            .doOnSuccess(savedMember -> {
-                                                // Publish events asynchronously AFTER save completes and transaction commits
-                                                assert savedMember != null;
+                                            .flatMap(savedMember ->
                                                 contributionConfigRepository.findAllByChamaId(savedMember.getChamaId())
-                                                        .flatMap(config -> publishMemberJoinedEvent(savedMember, config.getId()))
-                                                        .doOnError(error -> log.error("Failed to publish member joined events: {}", error.getMessage(), error))
-                                                        .subscribe();
-                                            })
+                                                        .next() // Take only the first config to avoid duplicate invoices
+                                                        .flatMap(config -> invoiceService.autoCreateInvoicesForMember(savedMember.getId(), config.getId()))
+
+                                                        .doOnSuccess(v -> log.info("Created invoices for new member {} in chama {}", savedMember.getMemberId(), savedMember.getChamaId()))
+                                                        .doOnError(error -> log.error("Failed to create invoices for new member: {}", error.getMessage(), error))
+                                                        .onErrorResume(e -> Mono.empty())
+                                                        .thenReturn(savedMember)
+                                            )
                                             .map(savedChamaMember -> new ChamaMemberDto(
                                                     savedChamaMember.getMemberId(),
                                                     savedChamaMember.getChamaId(),
@@ -90,25 +95,5 @@ public class ChamaMemberService {
 
     }
 
-    private Mono<Void> publishMemberJoinedEvent(ChamaMember chamaMember, Long periodId) {
-        return Mono.fromRunnable(() -> {
-                    try {
-                        // Publish event for new member joining
-                        systemEventBus.publishContributionPeriodCreated(
-                                new ContributionPeriodCreatedEvent(
-                                        chamaMember.getChamaId(),
-                                        periodId,
-                                        true,
-                                        chamaMember.getId()
-                                )
-                        );
-                        log.info("Published MemberJoinedEvent for member {} in chama {}",
-                                chamaMember.getMemberId(), chamaMember.getChamaId());
-                    } catch (Exception e) {
-                        log.error("Failed to publish MemberJoinedEvent: {}", e.getMessage(), e);
-                        // Don't fail the whole operation if event publishing fails
-                    }
-                }).subscribeOn(Schedulers.boundedElastic()).then();
-    }
 
 }

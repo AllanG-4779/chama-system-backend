@@ -1,19 +1,23 @@
 package com.allang.chamasystem.service;
 
 import com.allang.chamasystem.exceptions.GenericExceptions;
+import com.allang.chamasystem.models.Chama;
+import com.allang.chamasystem.models.ContributionConfig;
 import com.allang.chamasystem.models.Invoice;
 import com.allang.chamasystem.models.InvoiceExcessApplication;
 import com.allang.chamasystem.repository.ChamaMemberRepository;
+import com.allang.chamasystem.repository.ChamaRepository;
 import com.allang.chamasystem.repository.ContributionConfigRepository;
 import com.allang.chamasystem.repository.InvoiceExcessApplicationRepository;
 import com.allang.chamasystem.repository.InvoiceRepository;
-import lombok.Generated;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -25,6 +29,7 @@ public class InvoiceService {
     private final ContributionConfigRepository contributionConfigRepository;
     private final InvoiceRepository invoiceRepository;
     private final InvoiceExcessApplicationRepository excessApplicationRepository;
+    private final ChamaRepository chamaRepository;
 
     public Mono<Invoice> createInvoiceForMember(Long chamaMemberId, Long periodId, String type) {
         return contributionConfigRepository.findById(periodId)
@@ -32,7 +37,7 @@ public class InvoiceService {
                     // Logic to create invoice based on type and config
                     var invoice = new Invoice();
                     invoice.setAmountDue(config.getAmount());
-                    invoice.setAmountPaid(java.math.BigDecimal.ZERO);
+                    invoice.setAmountPaid(BigDecimal.ZERO);
                     invoice.setMemberId(chamaMemberId);
                     invoice.setDueDate(config.getGracePeriodEnd());
                     invoice.setPeriodId(periodId);
@@ -42,8 +47,81 @@ public class InvoiceService {
                     invoice.setCreatedAt(LocalDateTime.now());
                     invoice.setIssueDate(LocalDate.now());
                     invoice.setUpdatedAt(LocalDateTime.now());
-                    return invoiceRepository.save(invoice);
+                    return invoiceRepository.save(invoice).flatMap(savedInvoice -> createPenaltyIfGracePeriodExpired(savedInvoice, config));
                 });
+    }
+
+    /**
+     * Create a penalty invoice if the grace period has expired
+     */
+    private Mono<Invoice> createPenaltyIfGracePeriodExpired(Invoice contributionInvoice, ContributionConfig config) {
+        if (config.getGracePeriodEnd() == null || !config.getGracePeriodEnd().isBefore(LocalDate.now())) {
+            // Grace period not expired, return the contribution invoice as-is
+            return Mono.just(contributionInvoice);
+        }
+
+        return chamaRepository.findById(config.getChamaId())
+                .flatMap(chama -> {
+                    if ("NONE".equals(chama.getLatePenaltyType())) {
+                        log.info("Penalties disabled for chama: {}", chama.getId());
+                        return Mono.just(contributionInvoice);
+                    }
+
+                    BigDecimal penaltyAmount = calculatePenaltyAmount(
+                            contributionInvoice.getAmountDue(),
+                            chama.getLatePenaltyType(),
+                            chama.getLatePenaltyAmount()
+                    );
+
+                    if (penaltyAmount.compareTo(BigDecimal.ZERO) <= 0) {
+                        log.warn("Penalty amount is zero or negative for invoice: {}", contributionInvoice.getId());
+                        return Mono.just(contributionInvoice);
+                    }
+
+                    Invoice penaltyInvoice = Invoice.builder()
+                            .memberId(contributionInvoice.getMemberId())
+                            .chamaId(contributionInvoice.getChamaId())
+                            .periodId(contributionInvoice.getPeriodId())
+                            .amountDue(penaltyAmount)
+                            .amountPaid(BigDecimal.ZERO)
+                            .type("PENALTY")
+                            .status("PENDING")
+                            .issueDate(LocalDate.now())
+                            .dueDate(LocalDate.now().plusDays(7))
+                            .createdAt(LocalDateTime.now())
+                            .updatedAt(LocalDateTime.now())
+                            .build();
+
+                    return invoiceRepository.save(penaltyInvoice)
+                            .flatMap(savedPenalty -> {
+                                contributionInvoice.setPenaltyInvoiceId(savedPenalty.getId());
+                                return invoiceRepository.save(contributionInvoice);
+                            })
+                            .doOnSuccess(inv -> log.info("Created penalty invoice for member {} due to expired grace period", contributionInvoice.getMemberId()));
+                })
+                .defaultIfEmpty(contributionInvoice);
+    }
+
+    /**
+     * Calculate penalty amount based on type and amount
+     */
+    private BigDecimal calculatePenaltyAmount(BigDecimal amount, String penaltyType, BigDecimal penaltyValue) {
+        return checkPenaltyAmount(amount, penaltyType, penaltyValue);
+    }
+
+    static BigDecimal checkPenaltyAmount(BigDecimal amount, String penaltyType, BigDecimal penaltyValue) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        if (penaltyValue == null || penaltyValue.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        return switch (penaltyType) {
+            case "FIXED" -> penaltyValue;
+            case "PERCENTAGE" -> amount.multiply(penaltyValue).divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP);
+            default -> BigDecimal.ZERO;
+        };
     }
 
     public Mono<Void> updateInvoiceBalanceAndStatus(Long invoiceId, java.math.BigDecimal paymentAmount) {
@@ -151,7 +229,8 @@ public class InvoiceService {
 
     /**
      * Auto-apply available excess balance to any invoice (reusable for contributions, penalties, etc.)
-     * @param memberId The member whose excess to apply
+     *
+     * @param memberId        The member whose excess to apply
      * @param targetInvoiceId The invoice to apply excess to
      * @return Updated invoice with excess applied
      */
@@ -198,6 +277,29 @@ public class InvoiceService {
     public Mono<Invoice> createInvoiceAndAutoApplyExcess(Long chamaMemberId, Long periodId, String type) {
         return createInvoiceForMember(chamaMemberId, periodId, type)
                 .flatMap(newInvoice -> autoApplyExcessToInvoice(chamaMemberId, newInvoice.getId()));
+    }
+
+    /**
+     * Find all unpaid invoices for a member and apply available excess to them
+     */
+    public Mono<Void> applyExcessToUnpaidInvoices(Long memberId) {
+        return invoiceRepository.findUnpaidInvoicesByMemberId(memberId)
+                .flatMap(invoice -> autoApplyExcessToInvoice(memberId, invoice.getId()))
+                .then();
+    }
+
+    /**
+     * Scheduled job to find all members with excess balances and apply them to unpaid invoices
+     * Runs every 24 hours
+     */
+    @Scheduled(fixedRate = 24 * 60 * 60 * 1000)
+    public void applyExcessToAllUnpaidInvoices() {
+        log.info("Starting scheduled job to apply excess balances to unpaid invoices...");
+        invoiceRepository.findMemberIdsWithExcess()
+                .flatMap(this::applyExcessToUnpaidInvoices)
+                .doOnComplete(() -> log.info("Completed applying excess balances to unpaid invoices"))
+                .doOnError(error -> log.error("Error applying excess balances: {}", error.getMessage(), error))
+                .subscribe();
     }
 
 }
